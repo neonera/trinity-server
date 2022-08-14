@@ -1,0 +1,27 @@
+{
+	"name": "trinity-server",
+	"version": "0.0.1",
+	"description": "Backend WebSocket server for Trinity Bowling Software",
+	"type": "module",
+	"main": "main.js",
+	"scripts": {
+		"ws": "npx tsc && PASS=test node main.js"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/neonera/trinity-server.git"
+	},
+	"author": "EFlynn25",
+	"bugs": {
+		"url": "https://github.com/neonera/beam_server/issues"
+	},
+	"homepage": "https://github.com/neonera/beam_server#readme",
+	"dependencies": {
+		"@types/ws": "^8.5.3",
+		"prettier": "^2.7.1",
+		"ws": "^8.8.1"
+	},
+	"devDependencies": {
+		"typescript": "^4.7.4"
+	}
+}
