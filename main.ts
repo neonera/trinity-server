@@ -1,10 +1,11 @@
 import { type WebSocket, WebSocketServer } from "ws";
-import { JsonData, Lanes } from "./types";
+import type { JsonData, LanesType } from "./types";
 
 console.log("∴ Trinity Bowling Software ∴");
 
 const server = new WebSocketServer({ port: 2053 });
-let lanes: Lanes = { 27: { tv: null, user: null, bowlers: 3, games: 2, bowler_names: [] } };
+
+let lanes: LanesType = { 27: { tv: null, user: null, bowlerAmt: 3, games: 2, bowler_names: [], bowlers: {} } };
 let adminSocket: WebSocket | null;
 
 server.on("connection", (ws: WebSocket) => {
@@ -34,7 +35,7 @@ server.on("connection", (ws: WebSocket) => {
 				response = { response: true, lane, type };
 			}
 		} else if (jsonData.command === "set_bowler_names") {
-			if (type !== "user" || jsonData.names.length !== lanes[lane].bowlers) {
+			if (type !== "user" || jsonData.names.length !== lanes[lane].bowlerAmt) {
 				response = { response: false };
 			} else {
 				lanes[lane].bowler_names = jsonData.names;
@@ -46,14 +47,14 @@ server.on("connection", (ws: WebSocket) => {
 		if (admin) {
 			if (jsonData.command === "create_lanes") {
 				jsonData.lanes.forEach((lane: number) => {
-					lanes[lane] = { tv: null, user: null, bowlers: 0, games: 0, bowler_names: [] };
+					lanes[lane] = { tv: null, user: null, bowlerAmt: 0, games: 0, bowler_names: [], bowlers: {} };
 				});
 				response = { response: true };
 			} else if (jsonData.command === "set_bowlers") {
 				if (!lanes[lane]) {
 					response = { response: null };
 				} else {
-					lanes[lane].bowlers = jsonData.bowlers;
+					lanes[lane].bowlerAmt = jsonData.bowlers;
                     const broadcast = { command: "get_bowlers", response: true, bowlers: jsonData.bowlers };
                     sendmsg(lanes[lane].user, lane, type, broadcast);
                     sendmsg(lanes[lane].tv, lane, type, broadcast);
@@ -78,7 +79,6 @@ server.on("connection", (ws: WebSocket) => {
 	ws.on("close", () => {
 		if (lane && type) lanes[lane][type] = null;
 		console.log(`\x1b[31m×\x1b[0m [${console_prefix(lane, type, admin)}]`);
-		if (lanes[lane] && !lanes[lane].tv && !lanes[lane].user) delete lanes[lane];
 		if (admin) adminSocket = null;
 	});
 });
