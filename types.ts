@@ -4,10 +4,16 @@ export type LanesType = {
 	[lane: number]: {
 		tv: WebSocket | null;
 		user: WebSocket | null;
-		bowlerAmt: number;
-		games: number;
-		bowler_names: string[];
-		bowlers: BowlersType;
+		data: {
+			bowlerAmt: number;
+			gamesAmt: number;
+			currentBowler: string;
+			currentGame: number;
+			currentFrame: number;
+			past_games: BowlersType[];
+			bowlers: BowlersType;
+			pins: PinsType;
+		};
 	};
 };
 
@@ -23,10 +29,10 @@ export type PinsType = number[];
 
 // Commands
 
-export type JsonData = Initialize | SetBowlerNames | CreateLanes | SetBowlers | SetGames;
+export type JsonData = Initialize | StartGame | CreateLanes | SetBowlers | SetGames;
 
 export type Initialize = { command: "initialize"; lane: number; type: "tv" | "user"; pass?: string };
-export type SetBowlerNames = { command: "set_bowler_names"; names: string[] };
+export type StartGame = { command: "start_game"; names: string[] };
 
 // Admin
 export type CreateLanes = { command: "create_lanes"; lanes: number[] };
