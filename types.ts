@@ -4,17 +4,27 @@ export type LanesType = {
 	[lane: number]: {
 		tv: WebSocket | null;
 		user: WebSocket | null;
-		data: {
-			bowlerAmt: number;
-			gamesAmt: number;
-			currentBowler: string;
-			currentGame: number;
-			currentFrame: number;
-			past_games: BowlersType[];
-			bowlers: BowlersType;
-			pins: PinsType;
-		};
+		data: LanesDataType;
 	};
+};
+
+export type AdminLanesType = {
+	[lane: number]: {
+		tv: boolean;
+		user: boolean;
+		data: LanesDataType;
+	};
+};
+
+export type LanesDataType = {
+	bowlerAmt: number;
+	gamesAmt: number;
+	currentBowler: string;
+	currentGame: number;
+	currentFrame: number;
+	past_games: BowlersType[];
+	bowlers: BowlersType;
+	pins: PinsType;
 };
 
 // Games
