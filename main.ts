@@ -25,9 +25,6 @@ let adminSockets: WebSocket[] = [];
 	};
 });
 
-lanes[4].data.bowlerAmt = 3;
-lanes[4].data.gamesAmt = 2;
-
 server.on("connection", (ws: WebSocket) => {
 	console.log("New connection.");
 	let lane: number = 0;
@@ -103,24 +100,24 @@ server.on("connection", (ws: WebSocket) => {
 				});
 				response = { response: true };
 			} else if (jsonData.command === "set_bowlers") {
-				if (!lanes[lane]) {
+				if (!lanes[jsonData.lane]) {
 					response = { response: null };
 				} else {
-					lanes[lane].data.bowlerAmt = jsonData.bowlers;
-					const broadcast = { command: "set_bowlers", response: true, bowlers: jsonData.bowlers };
-					sendmsg(lanes[lane].user, lane, type, broadcast);
-					sendmsg(lanes[lane].tv, lane, type, broadcast);
-					response = { response: true, bowlers: jsonData.bowlers };
+					lanes[jsonData.lane].data.bowlerAmt = jsonData.bowlers;
+					const broadcast = { command: "get_bowlers", response: true, bowlers: jsonData.bowlers };
+					sendmsg(lanes[jsonData.lane].user, jsonData.lane, "user", broadcast);
+					sendmsg(lanes[jsonData.lane].tv, jsonData.lane, "tv", broadcast);
+					response = { response: true, lane: jsonData.lane, bowlers: jsonData.bowlers };
 				}
 			} else if (jsonData.command === "set_games") {
-				if (!lanes[lane]) {
+				if (!lanes[jsonData.lane]) {
 					response = { response: null };
 				} else {
-					lanes[lane].data.gamesAmt = jsonData.games;
+					lanes[jsonData.lane].data.gamesAmt = jsonData.games;
 					const broadcast = { command: "get_games", response: true, games: jsonData.games };
-					sendmsg(lanes[lane].user, lane, type, broadcast);
-					sendmsg(lanes[lane].tv, lane, type, broadcast);
-					response = { response: true };
+					sendmsg(lanes[jsonData.lane].user, jsonData.lane, "user", broadcast);
+					sendmsg(lanes[jsonData.lane].tv, jsonData.lane, "tv", broadcast);
+					response = { response: true, lane: jsonData.lane, games: jsonData.games };
 				}
 			}
 		} else {
@@ -163,7 +160,7 @@ const admin_lanes = (lanes: LanesType): AdminLanesType => {
 		};
 	});
 	return new_lanes;
-}
+};
 
 const update_lanes = (lane: number, lanes: LanesType) => {
 	let new_lanes: AdminLanesType = admin_lanes(lanes);
