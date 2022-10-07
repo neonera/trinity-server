@@ -230,7 +230,7 @@ const update_lanes = (lane: number, lanes: LanesType) => {
 const bowlPins = (lane: number, pins_knocked: PinsType) => {
 	const data = lanes[lane].data;
 
-	if (!data || data.currentFrame === 11) return;
+	if (data.gamesAmt === 0 || data.currentFrame === 11) return;
 	else setTimeout(() => bowlPins(lane, randomPins(lane) ?? []), 100); // removable
 
 	const pins_amt = pins_knocked.length;
@@ -288,7 +288,7 @@ const randomPins = (lane: number) => {
 	// Only for testing purposes
 	const data = lanes[lane].data;
 
-	if (!data) return;
+	if (data.gamesAmt === 0) return;
 
 	const frames = data.bowlers[data.currentBowler].frames;
 	const last_frame = frames.at(-1) ?? [];
