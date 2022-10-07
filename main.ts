@@ -71,7 +71,7 @@ server.on("connection", (ws: WebSocket) => {
 				data.currentFrame = 1;
 				data.currentGame++;
 
-				setTimeout(() => bowlPins(lane, randomPins(lane)), 3000);
+				setTimeout(() => bowlPins(lane, randomPins(lane) ?? []), 10000);
 
 				const broadcast = { response: true, names: jsonData.names };
 				sendmsg(lanes[lane].tv, lane, "tv", { command: "start_game", ...broadcast });
@@ -118,6 +118,64 @@ server.on("connection", (ws: WebSocket) => {
 					sendmsg(lanes[jsonData.lane].user, jsonData.lane, "user", broadcast);
 					sendmsg(lanes[jsonData.lane].tv, jsonData.lane, "tv", broadcast);
 					response = { response: true, lane: jsonData.lane, games: jsonData.games };
+				}
+			} else if (jsonData.command === "add_bowler") {
+				const bowlers = lanes[jsonData.lane]?.data.bowlers;
+				if (!lanes[jsonData.lane]) {
+					response = { response: null };
+				} else if (Object.keys(bowlers).length === 0 || bowlers[Object.keys(bowlers)[0]].frames.length > 0) {
+					response = { response: false };
+				} else {
+					const past_games = lanes[jsonData.lane].data.past_games;
+					lanes[jsonData.lane].data.past_games = past_games.map((game, i) => ({
+						...game,
+						[jsonData.name]: { frames: [] },
+					}));
+					lanes[jsonData.lane].data.bowlers = {
+						...bowlers,
+						[jsonData.name]: { frames: [] },
+					};
+					lanes[jsonData.lane].data.bowlerAmt += 1;
+
+					const new_past_games = lanes[jsonData.lane].data.past_games;
+					const new_bowlers = lanes[jsonData.lane].data.bowlers;
+
+					const broadcast = {
+						command: "get_add_bowler",
+						response: true,
+						past_games: new_past_games,
+						bowlers: new_bowlers,
+					};
+					sendmsg(lanes[jsonData.lane].user, jsonData.lane, "user", broadcast);
+					sendmsg(lanes[jsonData.lane].tv, jsonData.lane, "tv", broadcast);
+
+					response = {
+						response: true,
+						lane: jsonData.lane,
+						past_games: new_past_games,
+						bowlers: new_bowlers,
+					};
+				}
+			} else if (jsonData.command === "stop_session") {
+				if (!lanes[jsonData.lane]) {
+					response = { response: null };
+				} else {
+					lanes[jsonData.lane].data = {
+						bowlerAmt: 0,
+						gamesAmt: 0,
+						currentBowler: "",
+						currentGame: 0,
+						currentFrame: 1,
+						past_games: [],
+						bowlers: {},
+						pins: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+					};
+
+					const broadcast = { command: "stop_session", response: true };
+					sendmsg(lanes[jsonData.lane].user, jsonData.lane, "user", broadcast);
+					sendmsg(lanes[jsonData.lane].tv, jsonData.lane, "tv", broadcast);
+
+					response = { response: true, lane: jsonData.lane };
 				}
 			}
 		} else {
@@ -172,8 +230,8 @@ const update_lanes = (lane: number, lanes: LanesType) => {
 const bowlPins = (lane: number, pins_knocked: PinsType) => {
 	const data = lanes[lane].data;
 
-	if (data.currentFrame === 11) return;
-	else setTimeout(() => bowlPins(lane, randomPins(lane)), 100); // removable
+	if (!data || data.currentFrame === 11) return;
+	else setTimeout(() => bowlPins(lane, randomPins(lane) ?? []), 100); // removable
 
 	const pins_amt = pins_knocked.length;
 	let reset_pins = pins_amt === data.pins.length;
@@ -229,6 +287,8 @@ const bowlPins = (lane: number, pins_knocked: PinsType) => {
 const randomPins = (lane: number) => {
 	// Only for testing purposes
 	const data = lanes[lane].data;
+
+	if (!data) return;
 
 	const frames = data.bowlers[data.currentBowler].frames;
 	const last_frame = frames.at(-1) ?? [];

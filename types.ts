@@ -39,7 +39,7 @@ export type PinsType = number[];
 
 // Commands
 
-export type JsonData = Initialize | StartGame | CreateLanes | SetBowlers | SetGames;
+export type JsonData = Initialize | StartGame | CreateLanes | SetBowlers | SetGames | AddBowler | StopSession;
 
 export type Initialize = { command: "initialize"; lane: number; type: "tv" | "user"; pass?: string };
 export type StartGame = { command: "start_game"; names: string[] };
@@ -48,3 +48,5 @@ export type StartGame = { command: "start_game"; names: string[] };
 export type CreateLanes = { command: "create_lanes"; lanes: number[] };
 export type SetBowlers = { command: "set_bowlers"; lane: number; bowlers: number };
 export type SetGames = { command: "set_games"; lane: number; games: number };
+export type AddBowler = { command: "add_bowler"; lane: number; name: string };
+export type StopSession = { command: "stop_session"; lane: number };
