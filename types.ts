@@ -17,12 +17,12 @@ export type AdminLanesType = {
 };
 
 export type LanesDataType = {
-	bowlerAmt: number;
+	bowlersAmt: number;
 	gamesAmt: number;
 	currentBowler: string;
 	currentGame: number;
 	currentFrame: number;
-	past_games: BowlersType[];
+	pastGames: BowlersType[];
 	bowlers: BowlersType;
 	pins: PinsType;
 };

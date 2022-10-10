@@ -7,23 +7,27 @@ const server = new WebSocketServer({ port: 2053 });
 
 let lanes: LanesType = {};
 let adminSockets: WebSocket[] = [];
+let bowlingAlleyName = "Lava Lanes";
+let bowlingAlleyColor = "hsl(8deg, 75%, 50%)";
 
 [...Array(8).keys()].forEach((num) => {
 	lanes[num + 1] = {
 		tv: null,
 		user: null,
 		data: {
-			bowlerAmt: 0,
+			bowlersAmt: 0,
 			gamesAmt: 0,
 			currentBowler: "",
 			currentGame: 0,
 			currentFrame: 1,
-			past_games: [],
+			pastGames: [],
 			bowlers: {},
 			pins: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
 		},
 	};
 });
+
+const updateLaneCommands = [];
 
 server.on("connection", (ws: WebSocket) => {
 	console.log("New connection.");
@@ -39,9 +43,14 @@ server.on("connection", (ws: WebSocket) => {
 		if (jsonData.command === "initialize") {
 			if (jsonData.pass === process.env.PASS) {
 				admin = true;
-				// adminSocket = ws;
 				adminSockets.push(ws);
-				response = { response: true, type: "admin", lanes: admin_lanes(lanes) };
+				response = {
+					response: true,
+					type: "admin",
+					lanes: admin_lanes(),
+					bowlingAlleyName,
+					bowlingAlleyColor,
+				};
 			} else if (!lanes[jsonData.lane]) {
 				response = { response: null, lane: jsonData.lane, type: jsonData.type };
 			} else if (lanes[jsonData.lane][jsonData.type]) {
@@ -51,20 +60,28 @@ server.on("connection", (ws: WebSocket) => {
 				lane = jsonData.lane;
 				type = jsonData.type;
 
-				response = { response: true, lane, type, ...lanes[jsonData.lane].data };
+				response = {
+					response: true,
+					lane,
+					type,
+					laneData: lanes[jsonData.lane].data,
+					bowlingAlleyName,
+					bowlingAlleyColor,
+				};
+				update_admins(lane);
 			}
 		} else if (jsonData.command === "start_game") {
 			let duplicates = jsonData.names.filter((item, index) => jsonData.names.indexOf(item) != index);
 			if (
 				type !== "user" ||
-				jsonData.names.length !== lanes[lane].data.bowlerAmt ||
+				jsonData.names.length !== lanes[lane].data.bowlersAmt ||
 				lanes[lane].data.currentGame === lanes[lane].data.gamesAmt ||
 				duplicates.length > 0
 			) {
 				response = { response: false };
 			} else {
 				const data = lanes[lane].data;
-				if (data.currentGame > 0) data.past_games.push(data.bowlers);
+				if (data.currentGame > 0) data.pastGames.push(data.bowlers);
 				jsonData.names.forEach((name) => (data.bowlers[name] = { frames: [] }));
 				data.pins = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 				data.currentBowler = Object.keys(data.bowlers)[0];
@@ -73,10 +90,8 @@ server.on("connection", (ws: WebSocket) => {
 
 				setTimeout(() => bowlPins(lane, randomPins(lane) ?? []), 10000);
 
-				const broadcast = { response: true, names: jsonData.names };
-				sendmsg(lanes[lane].tv, lane, "tv", { command: "start_game", ...broadcast });
-				// sendmsg(adminSocket, lane, "admin", { command: "start_game", ...broadcast, lane });
-				response = broadcast;
+				update_admins(lane);
+				update_lane(lane);
 			}
 		}
 
@@ -87,37 +102,33 @@ server.on("connection", (ws: WebSocket) => {
 						tv: null,
 						user: null,
 						data: {
-							bowlerAmt: 0,
+							bowlersAmt: 0,
 							gamesAmt: 0,
 							currentBowler: "",
 							currentGame: 0,
 							currentFrame: 1,
-							past_games: [],
+							pastGames: [],
 							bowlers: {},
 							pins: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
 						},
 					};
 				});
-				response = { response: true };
+				update_admins(0);
 			} else if (jsonData.command === "set_bowlers") {
 				if (!lanes[jsonData.lane]) {
 					response = { response: null };
 				} else {
-					lanes[jsonData.lane].data.bowlerAmt = jsonData.bowlers;
-					const broadcast = { command: "get_bowlers", response: true, bowlers: jsonData.bowlers };
-					sendmsg(lanes[jsonData.lane].user, jsonData.lane, "user", broadcast);
-					sendmsg(lanes[jsonData.lane].tv, jsonData.lane, "tv", broadcast);
-					response = { response: true, lane: jsonData.lane, bowlers: jsonData.bowlers };
+					lanes[jsonData.lane].data.bowlersAmt = jsonData.bowlers;
+					update_admins(jsonData.lane);
+					update_lane(jsonData.lane);
 				}
 			} else if (jsonData.command === "set_games") {
 				if (!lanes[jsonData.lane]) {
 					response = { response: null };
 				} else {
 					lanes[jsonData.lane].data.gamesAmt = jsonData.games;
-					const broadcast = { command: "get_games", response: true, games: jsonData.games };
-					sendmsg(lanes[jsonData.lane].user, jsonData.lane, "user", broadcast);
-					sendmsg(lanes[jsonData.lane].tv, jsonData.lane, "tv", broadcast);
-					response = { response: true, lane: jsonData.lane, games: jsonData.games };
+					update_admins(jsonData.lane);
+					update_lane(jsonData.lane);
 				}
 			} else if (jsonData.command === "add_bowler") {
 				const bowlers = lanes[jsonData.lane]?.data.bowlers;
@@ -126,8 +137,8 @@ server.on("connection", (ws: WebSocket) => {
 				} else if (Object.keys(bowlers).length === 0 || bowlers[Object.keys(bowlers)[0]].frames.length > 0) {
 					response = { response: false };
 				} else {
-					const past_games = lanes[jsonData.lane].data.past_games;
-					lanes[jsonData.lane].data.past_games = past_games.map((game, i) => ({
+					const pastGames = lanes[jsonData.lane].data.pastGames;
+					lanes[jsonData.lane].data.pastGames = pastGames.map((game, i) => ({
 						...game,
 						[jsonData.name]: { frames: [] },
 					}));
@@ -135,52 +146,30 @@ server.on("connection", (ws: WebSocket) => {
 						...bowlers,
 						[jsonData.name]: { frames: [] },
 					};
-					lanes[jsonData.lane].data.bowlerAmt += 1;
+					lanes[jsonData.lane].data.bowlersAmt += 1;
 
-					const new_past_games = lanes[jsonData.lane].data.past_games;
-					const new_bowlers = lanes[jsonData.lane].data.bowlers;
-
-					const broadcast = {
-						command: "get_add_bowler",
-						response: true,
-						past_games: new_past_games,
-						bowlers: new_bowlers,
-					};
-					sendmsg(lanes[jsonData.lane].user, jsonData.lane, "user", broadcast);
-					sendmsg(lanes[jsonData.lane].tv, jsonData.lane, "tv", broadcast);
-
-					response = {
-						response: true,
-						lane: jsonData.lane,
-						past_games: new_past_games,
-						bowlers: new_bowlers,
-					};
+					update_admins(jsonData.lane);
+					update_lane(jsonData.lane);
 				}
 			} else if (jsonData.command === "stop_session") {
 				if (!lanes[jsonData.lane]) {
 					response = { response: null };
 				} else {
 					lanes[jsonData.lane].data = {
-						bowlerAmt: 0,
+						bowlersAmt: 0,
 						gamesAmt: 0,
 						currentBowler: "",
 						currentGame: 0,
 						currentFrame: 1,
-						past_games: [],
+						pastGames: [],
 						bowlers: {},
 						pins: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
 					};
 
-					const broadcast = { command: "stop_session", response: true };
-					sendmsg(lanes[jsonData.lane].user, jsonData.lane, "user", broadcast);
-					sendmsg(lanes[jsonData.lane].tv, jsonData.lane, "tv", broadcast);
-
-					response = { response: true, lane: jsonData.lane };
+					update_admins(jsonData.lane);
+					update_lane(jsonData.lane);
 				}
 			}
-		} else {
-			// Share current lanes with admin
-			update_lanes(lane, lanes);
 		}
 
 		if (response) sendmsg(ws, lane, type, { command: jsonData.command, ...response }, admin);
@@ -190,11 +179,10 @@ server.on("connection", (ws: WebSocket) => {
 		if (lane && type) lanes[lane][type] = null;
 		console.log(`\x1b[31m×\x1b[0m [${console_prefix(lane, type, admin)}]`);
 		if (admin) {
-			// adminSocket = null;
 			const index = adminSockets.indexOf(ws);
 			if (index > -1) adminSockets.splice(index, 1);
 		}
-		update_lanes(lane, lanes);
+		update_admins(lane);
 	});
 });
 
@@ -208,7 +196,7 @@ const sendmsg = (ws: WebSocket | null, lane: number, type: string, data: any, ad
 const console_prefix = (lane: number, type: string, admin?: boolean) =>
 	admin ? "admin" : (lane || "") + " " + (type ?? "");
 
-const admin_lanes = (lanes: LanesType): AdminLanesType => {
+const admin_lanes = (): AdminLanesType => {
 	let new_lanes: AdminLanesType = {};
 	Object.keys(lanes).forEach((lane: string) => {
 		new_lanes[+lane] = {
@@ -220,11 +208,18 @@ const admin_lanes = (lanes: LanesType): AdminLanesType => {
 	return new_lanes;
 };
 
-const update_lanes = (lane: number, lanes: LanesType) => {
-	let new_lanes: AdminLanesType = admin_lanes(lanes);
+const update_admins = (lane: number) => {
+	let new_lanes: AdminLanesType = admin_lanes();
 	adminSockets.forEach((socket) => {
 		sendmsg(socket, lane, "admin", { command: "update_lanes", lanes: new_lanes });
 	});
+};
+
+const update_lane = (lane: number) => {
+	if (lanes[lane]) {
+		sendmsg(lanes[lane].user, lane, "user", { command: "update_lanes", laneData: lanes[lane].data });
+		sendmsg(lanes[lane].tv, lane, "tv", { command: "update_lanes", laneData: lanes[lane].data });
+	}
 };
 
 const bowlPins = (lane: number, pins_knocked: PinsType) => {
@@ -277,11 +272,8 @@ const bowlPins = (lane: number, pins_knocked: PinsType) => {
 	}
 	if (reset_pins) data.pins = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-	const broadcast = { command: "bowl_pins", response: true, pins_knocked };
-	sendmsg(lanes[lane].user, lane, "pins", broadcast);
-	sendmsg(lanes[lane].tv, lane, "pins", broadcast);
-
-	update_lanes(lane, lanes);
+	update_admins(lane);
+	update_lane(lane);
 };
 
 const randomPins = (lane: number) => {
